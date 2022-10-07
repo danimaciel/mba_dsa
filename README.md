@@ -1,5 +1,7 @@
 # mba_dsa
 
+#### PACOTES #######
+
 pacotes <- c("XML", "readxl", "topicmodels", "caret", "tidyr", "ggplot2", "quanteda", "extractr","pdftools","stringr","NLP","curl", "tidytext", "wordcloud", "dplyr", "SnowballC", "stopwords", "pdftools", "tm", "RColorBrewer", "magrittr")
 
 install.packages("textplot")
@@ -15,13 +17,15 @@ if(sum(as.numeric(!pacotes %in% installed.packages())) != 0){
   sapply(pacotes, require, character = T) 
 }
 
+##### CHAMANDO A BASE #####
+
 base_mba <- readxl::read_excel(path = "Scopus _ Base com registros para análise MBA(rotulada).xlsx")
 base_mba <- data.frame(base_mba) 
 
 base_mba$Abstract <- tolower(base_mba$Abstract) 
 
 
-####### Eliminação dos artigos relacionados à saúde 
+###### Eliminação dos artigos relacionados à saúde #######
 
 base_mba_remove <- grep("health*", base_mba$Abstract, invert = TRUE)
 base_mba_remove_title <- grep("health*", base_mba$Title)
@@ -30,6 +34,8 @@ base_mba_remove_title
 base_mba
 
 base_mba <- base_mba[c(base_mba_remove), ]
+
+##### VISUALIZAÇÃO DOS TRABALHOS POR ANO #####
 
 base_mba %>% filter(Year < 2021) %>%  
   ggplot(aes(x = Year))+
@@ -42,6 +48,8 @@ base_mba %>% filter(Year < 2021) %>%
 
 
 dim(base_mba)
+
+##### LIMPANDO A BASE: REGEX, STOPWORDS #####
 
 # Regex - tirar números da base
 base_mba <- base_mba %>% 
@@ -90,13 +98,14 @@ lista3 <- lapply(X = lista2,
 # Transformação em vetor
 base_mba$Abstract <- unlist(lista3)
 
+##### TOKENIZÃO: NGRAMS, BIGRAMS E TRIGRAMS ######
+
 # Tokenização | Separando em N-grams 
 base_mba_tokens_1 <- base_mba %>%
   unnest_tokens(output = palavra_resumo,
                 input = Abstract,
                 token = "ngrams",
                 n = 1 )
-
 
 # Separando em N-gram de 2
 base_mba_tokens_2 <- base_mba %>%
@@ -131,7 +140,8 @@ contagem_three_gramm <- base_mba_tokens_3 %>%
         sort = TRUE) %>%
   filter(n>=NFILTER)
 
-# Criando o Corpus
+
+##### CRIANDO O CORPUS, RODANDO FREQUÊNCIA DE TERMOS E MATRIZ #####
 
 corpus <- Corpus(VectorSource(base_mba$Abstract))
 
@@ -154,7 +164,7 @@ JSS_dtm <- JSS_dtm[slam::row_sums(JSS_dtm) > 0,]
 summary(slam::col_sums(JSS_dtm))
 summary(term_tfidf)
 
-# Criação dos agrupamentos
+##### AGRUPAMENTOS DE TÓPICOS #####
 
 k <- 30
 SEED <- 2010
@@ -184,36 +194,8 @@ base_mba <- data.frame(base_mba)
 Topic <- topics(jss_TM[["VEM"]], 1)
 Terms <- terms(jss_TM[["VEM"]], 50)
 
-wordcloud(words = Terms,
-          max.words = 50)
 
-topics_v24 <-
-  topics(jss_TM[["VEM"]])[grep("ACM International Conference Proceeding Series", vapply(base_mba[, "Source.title"],
-                                                                                        "[", 2, FUN.VALUE = ""))]
-
-topics(jss_TM[["VEM"]])[grep("ACM International Conference Proceeding Series", base_mba[, "Source.title"])]
-
-topics(jss_TM[["VEM_fixed"]])[grep("ACM International Conference Proceeding Series", base_mba[, "Source.title"])]
-
-topics(jss_TM[["VEM_fixed"]])[grep("model", base_mba$Abstract)]
-
-table(topics(jss_TM[["VEM_fixed"]])[grep("health*", base_mba$Abstract)])
-topics(jss_TM[["VEM_fixed"]])[grep("health*", base_mba$Abstract)]
-
-sum(table(topics(jss_TM[["VEM_fixed"]])[grep("health*", base_mba$Abstract, invert = TRUE)]))
-
-topics(jss_TM[["VEM"]])
-
-metodologia_VF <- topics(jss_TM[["VEM_fixed"]])[grep("model", base_mba$Abstract)] # ver metodologia
-
-saveRDS(jss_TM, 
-        file = "jss_tm.RDS")
-jss_TM <- readRDS("jss_tm.RDS")
-dim(jss_TM)
-
-writexl::write_xlsx(x = base_mba,
-                    path = "./base_mba_cluster.xlsx")
-
+##### VISUALIZAÇÃO #####
 
 # Gráfico revista x tópico 
 
@@ -332,9 +314,84 @@ wordcloud(words = trigram$palavra_resumo,
           rot.per=0.53,
           colors = brewer.pal(8, "Dark2"), 
           max.words = 150)
-
+          
 wordcloud(words = ngram$palavra_resumo,freq = ngram$n, min.freq = 100, random.order = TRUE, rot.per=0.35, colors = brewer.pal(8, "Dark2"),
           max.words = 200)
 
 wordcloud(words = bigram$palavra_resumo,freq = bigram$n, min.freq = 20, random.order = TRUE, colors = brewer.pal(8, "Dark2"),
           max.words = 100)
+          
+      
+  # Gráfico de calor 
+ 
+base_graf <- readxl::read_xlsx("base_atual.xlsx") 
+base_df <- base_graf[, c("Source.title", "VEM")] 
+
+df <- table(base_df)
+df <- as.data.frame.matrix(df) 
+df_sum <- apply(df, 1, sum) 
+df_sum <- order(df_sum, decreasing = TRUE) 
+df_sorted <- df[df_sum,] 
+df_sorted <- data.matrix(df_sorted) 
+heatmap(df_sorted[1:30, ], cexRow=0.8)     
+ 
+#### METODOLOGIA NA VARIÁVEL KEYWORD AUTHOR
+# Busca entre tabelas
+base_mba <- read_excel(path = "Scopus _ Base com registros para análise MBA.xlsx")
+base_mba <- data.frame(base_mba)
+metodologias <- read_excel(path = "Metodologias.xlsx")
+metodologias$Metodologia
+
+i_metodologia <- 18
+padrao_metodologia <- metodologias$Metodologia[i_metodologia]
+is_sel_base <- grep(pattern = padrao_metodologia,
+                    x = base_mba$Author.Keywords,
+                    ignore.case = TRUE,
+                    value = F)
+i_sel_base <- is_sel_base[3]
+class(base_mba[i_sel_base,"Author.Keywords"])
+
+keywords <- strsplit(x = base_mba[i_sel_base,"Author.Keywords"],
+                     split = ";")[[1]]
+
+termos_selecionados <- grep(pattern = padrao_metodologia,
+                            x = keywords,
+                            ignore.case = T,
+                            value = T)
+
+
+scopus[i_sel_base, "keyword_automatico"] <- paste(... = padrao_metodologia, ";", termos_selecionados)
+
+# uso do For para rodar a base toda
+
+for (i_metodologia in 1:nrow(metodologias)) {
+  # print(i_metodologia)
+  
+  padrao_metodologia <- metodologias$Metodologia[i_metodologia]
+  is_sel_base <- grep(pattern = padrao_metodologia,
+                      x = base_mba$Author.Keywords,
+                      ignore.case = TRUE,
+                      value = F)
+  if(length(is_sel_base) > 0) {
+    # print(is_sel_base)
+    # identificando apenas as ocorrências (traz as linhas de metodologia que ocorrem em scopus)
+    for (i_sel_base in is_sel_base) {
+      print(i_metodologia)
+      print(i_sel_base)
+      
+      keywords <- strsplit(x = base_mba[i_sel_base,"Author.Keywords"],
+                           split = ";")[[1]]
+      
+      termos_selecionados <- grep(pattern = padrao_metodologia,
+                                  x = keywords,
+                                  ignore.case = T,
+                                  value = T)
+      termos_selecionados <- paste(termos_selecionados,
+                                   collapse = "; ")
+      
+      base_mba[i_sel_base, "keyword_author"] <- paste(... = padrao_metodologia, ";", termos_selecionados)
+  
+      
+    }
+  }
+}
